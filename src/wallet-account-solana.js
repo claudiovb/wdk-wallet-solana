@@ -20,7 +20,7 @@ import {
   setTransactionMessageFeePayerSigner
 } from '@solana/signers'
 import { getBase64EncodedWireTransaction } from '@solana/transactions'
-import { verifySignature, signBytes } from '@solana/keys'
+import { signBytes } from '@solana/keys'
 import { setTransactionMessageLifetimeUsingBlockhash } from '@solana/transaction-messages'
 
 import HDKey from 'micro-key-producer/slip10.js'
@@ -131,7 +131,8 @@ export default class WalletAccountSolana extends WalletAccountReadOnlySolana {
    * @type {number}
    */
   get index () {
-    return +this.path.split('/').pop()
+    const segments = this.path.split('/')
+    return +segments[3].replace("'", '')
   }
 
   /**
@@ -183,22 +184,6 @@ export default class WalletAccountSolana extends WalletAccountReadOnlySolana {
     const signature = Buffer.from(signatureBytes).toString('hex')
 
     return signature
-  }
-
-  /**
-   * Verifies a message's signature.
-   *
-   * @param {string} message - The original message.
-   * @param {string} signature - The signature to verify.
-   * @returns {Promise<boolean>} True if the signature is valid.
-   */
-  async verify (message, signature) {
-    const messageBytes = Buffer.from(message, 'utf8')
-    const signatureBytes = Buffer.from(signature, 'hex')
-
-    const isValid = await verifySignature(this._signer.keyPair.publicKey, signatureBytes, messageBytes)
-
-    return isValid
   }
 
   /**
