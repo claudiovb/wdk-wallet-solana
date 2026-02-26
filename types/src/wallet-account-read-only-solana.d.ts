@@ -1,6 +1,5 @@
 /**
  * Read-only Solana wallet account implementation.
- *
  */
 export default class WalletAccountReadOnlySolana extends WalletAccountReadOnly {
     /**
@@ -137,4 +136,4 @@ export type SolanaWalletConfig = {
      */
     transferMaxFee?: number | bigint;
 };
-import { WalletAccountReadOnly } from '@tetherto/wdk-wallet';
+import { WalletAccountReadOnly } from "@tetherto/wdk-wallet";
