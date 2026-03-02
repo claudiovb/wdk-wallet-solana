@@ -26,7 +26,9 @@ import {
   appendTransactionMessageInstructions,
   getCompiledTransactionMessageEncoder,
   setTransactionMessageFeePayer,
-  compileTransactionMessage
+  compileTransactionMessage,
+  isTransactionMessageWithBlockhashLifetime,
+  isTransactionMessageWithDurableNonceLifetime
 } from '@solana/transaction-messages'
 import { getBase64Decoder } from '@solana/codecs'
 
@@ -153,9 +155,7 @@ export default class WalletAccountReadOnlySolana extends WalletAccountReadOnly {
       return 0n
     }
 
-    const tokenAccountBalance = await this._rpc
-      .getTokenAccountBalance(ata, { commitment: this._commitment })
-      .send()
+    const tokenAccountBalance = await this._rpc.getTokenAccountBalance(ata, { commitment: this._commitment }).send()
 
     return BigInt(tokenAccountBalance.value.amount)
   }
@@ -178,22 +178,19 @@ export default class WalletAccountReadOnlySolana extends WalletAccountReadOnly {
       // Handle native token transfer { to, value } transaction
       transactionMessage = await this._buildNativeTransferTransactionMessage(tx.to, tx.value)
     }
-    if (
-      transactionMessage?.instructions !== undefined &&
-      Array.isArray(transactionMessage.instructions)
-    ) {
-      // Check if blockhash/lifetime is missing and add it
-      if (!transactionMessage.lifetimeConstraint) {
+    if (transactionMessage?.instructions !== undefined && Array.isArray(transactionMessage.instructions)) {
+      // Check if the blockhash lifetime and the durable nonce are missing then add it
+      if (
+        !isTransactionMessageWithBlockhashLifetime(transactionMessage) &&
+        !isTransactionMessageWithDurableNonceLifetime(transactionMessage)
+      ) {
         const { value: latestBlockhash } = await this._rpc
           .getLatestBlockhash({
             commitment: this._commitment
           })
           .send()
 
-        transactionMessage = setTransactionMessageLifetimeUsingBlockhash(
-          latestBlockhash,
-          transactionMessage
-        )
+        transactionMessage = setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, transactionMessage)
       }
 
       // Check and verify fee payer
@@ -205,9 +202,7 @@ export default class WalletAccountReadOnlySolana extends WalletAccountReadOnly {
             : transactionMessage.feePayer.address
 
         if (feePayerAddress !== ownerAddress) {
-          throw new Error(
-            `Transaction fee payer (${feePayerAddress}) does not match wallet address (${ownerAddress})`
-          )
+          throw new Error(`Transaction fee payer (${feePayerAddress}) does not match wallet address (${ownerAddress})`)
         }
       }
       transactionMessage = setTransactionMessageFeePayer(ownerAddress, transactionMessage)
@@ -229,11 +224,7 @@ export default class WalletAccountReadOnlySolana extends WalletAccountReadOnly {
     }
 
     const { token, recipient, amount } = options
-    const transactionMessage = await this._buildSPLTransferTransactionMessage(
-      token,
-      recipient,
-      amount
-    )
+    const transactionMessage = await this._buildSPLTransferTransactionMessage(token, recipient, amount)
 
     const fee = await this._getTransactionFee(transactionMessage)
 
@@ -331,9 +322,7 @@ export default class WalletAccountReadOnlySolana extends WalletAccountReadOnly {
     instructions.push(transferInstruction)
 
     // Get latest blockhash
-    const { value: latestBlockhash } = await this._rpc
-      .getLatestBlockhash({ commitment: this._commitment })
-      .send()
+    const { value: latestBlockhash } = await this._rpc.getLatestBlockhash({ commitment: this._commitment }).send()
 
     // Build transaction message using pipe
     const transactionMessage = pipe(
@@ -368,9 +357,7 @@ export default class WalletAccountReadOnlySolana extends WalletAccountReadOnly {
     })
 
     // Get latest blockhash
-    const { value: latestBlockhash } = await this._rpc
-      .getLatestBlockhash({ commitment: this._commitment })
-      .send()
+    const { value: latestBlockhash } = await this._rpc.getLatestBlockhash({ commitment: this._commitment }).send()
 
     // Build transaction message using pipe
     const transactionMessage = pipe(
