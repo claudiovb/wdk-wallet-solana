@@ -48,6 +48,7 @@ import { verifySignature } from '@solana/keys'
 /** @typedef {import('@solana/transaction-messages').TransactionMessage} TransactionMessage */
 /** @typedef {ReturnType<typeof import('@solana/rpc').createSolanaRpc>} SolanaRpc */
 /** @typedef {ReturnType<import("@solana/rpc-api").SolanaRpcApi['getTransaction']>} SolanaTransactionReceipt */
+/** @typedef {import("@solana/rpc-types").Commitment} Commitment */
 
 /**
  * @typedef {Object} SimpleSolanaTransaction
@@ -62,7 +63,7 @@ import { verifySignature } from '@solana/keys'
 /**
  * @typedef {Object} SolanaWalletConfig
  * @property {string} [rpcUrl] - The provider's rpc url.
- * @property {'processed' | 'confirmed' | 'finalized'} [commitment] - The commitment level (default: 'confirmed').
+ * @property {Commitment} [commitment] - The commitment level (default: 'confirmed').
  * @property {number | bigint} [transferMaxFee] - Maximum allowed fee in lamports for transfer operations.
  */
 
@@ -104,7 +105,7 @@ export default class WalletAccountReadOnlySolana extends WalletAccountReadOnly {
        * Determines the level of finality required before returning results.
        *
        * @protected
-       * @type {string}
+       * @type {Commitment}
        */
       this._commitment = commitment
     }
