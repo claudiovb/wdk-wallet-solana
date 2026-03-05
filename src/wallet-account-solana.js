@@ -37,11 +37,12 @@ import { sodium_memzero } from 'sodium-universal'
 import WalletAccountReadOnlySolana from './wallet-account-read-only-solana.js'
 
 /** @typedef {import("@tetherto/wdk-wallet").IWalletAccount} IWalletAccount */
-
 /** @typedef {import('@tetherto/wdk-wallet').KeyPair} KeyPair */
 /** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
 /** @typedef {import('@tetherto/wdk-wallet').TransferOptions} TransferOptions */
 /** @typedef {import('@tetherto/wdk-wallet').TransferResult} TransferResult */
+
+/** @typedef {import('@solana/signers').KeyPairSigner} KeyPairSigner */
 
 /** @typedef {import('./wallet-account-read-only-solana.js').SolanaTransaction} SolanaTransaction */
 /** @typedef {import('./wallet-account-read-only-solana.js').SolanaWalletConfig} SolanaWalletConfig */
@@ -104,7 +105,7 @@ export default class WalletAccountSolana extends WalletAccountReadOnlySolana {
      * The Ed25519 key pair signer for signing transactions.
      *
      * @private
-     * @type {import('@solana/keys').KeyPairSigner | undefined}
+     * @type {KeyPairSigner | undefined}
      */
     this._signer = undefined
 
