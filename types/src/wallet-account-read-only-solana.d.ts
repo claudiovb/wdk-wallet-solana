@@ -1,6 +1,5 @@
 /**
  * Read-only Solana wallet account implementation.
- *
  */
 export default class WalletAccountReadOnlySolana extends WalletAccountReadOnly {
     /**
@@ -21,17 +20,17 @@ export default class WalletAccountReadOnlySolana extends WalletAccountReadOnly {
      * Solana RPC client for making HTTP requests to the blockchain.
      *
      * @protected
-     * @type {SolanaRpc}
+     * @type {SolanaRpc | undefined}
      */
-    protected _rpc: SolanaRpc;
+    protected _rpc: SolanaRpc | undefined;
     /**
      * The commitment level for querying transaction and account states.
      * Determines the level of finality required before returning results.
      *
      * @protected
-     * @type {string}
+     * @type {Commitment}
      */
-    protected _commitment: string;
+    protected _commitment: Commitment;
     /**
      * Returns the account's native SOL balance.
      *
@@ -105,6 +104,23 @@ export default class WalletAccountReadOnlySolana extends WalletAccountReadOnly {
      * @returns {Promise<boolean>} True if the signature is valid.
      */
     verify(message: string, signature: string): Promise<boolean>;
+    /**
+     * Ensures the transaction has either a blockhash lifetime or a durable nonce lifetime.
+     *
+     * @protected
+     * @param {SolanaTransaction} tx - The transaction.
+     * @returns {Promise<SolanaTransaction>} The transaction with lifetime.
+     */
+    protected _ensureLifetime(tx: SolanaTransaction): Promise<SolanaTransaction>;
+    /**
+     * Asserts that any explicit transaction fee payer matches this wallet address.
+     *
+     * @protected
+     * @param {SolanaTransaction} tx - The transaction.
+     * @returns {Promise<void>} Resolves when the transaction has no explicit fee payer or it matches this wallet address.
+     * @throws {Error} If the transaction fee payer does not match this wallet address.
+     */
+    protected _assertFeePayer (tx: SolanaTransaction): Promise<void>
 }
 export type TransactionResult = import("@tetherto/wdk-wallet").TransactionResult;
 export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
@@ -112,6 +128,7 @@ export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
 export type TransactionMessage = import("@solana/transaction-messages").TransactionMessage;
 export type SolanaRpc = ReturnType<typeof import("@solana/rpc").createSolanaRpc>;
 export type SolanaTransactionReceipt = ReturnType<import("@solana/rpc-api").SolanaRpcApi["getTransaction"]>;
+export type Commitment = import("@solana/rpc-types").Commitment;
 export type SimpleSolanaTransaction = {
     /**
      * - The recipient's Solana address.
@@ -125,16 +142,20 @@ export type SimpleSolanaTransaction = {
 export type SolanaTransaction = SimpleSolanaTransaction | TransactionMessage;
 export type SolanaWalletConfig = {
     /**
-     * - The provider's rpc url.
+     * - The provider's rpc url. If it's a list of urls, the provider failover strategy will be enabled.
      */
     rpcUrl?: string;
     /**
      * - The commitment level (default: 'confirmed').
      */
-    commitment?: "processed" | "confirmed" | "finalized";
+    commitment?: Commitment;
+    /**
+     * - The number of retries in the failover mechanism.
+     */
+    retries?: number,
     /**
      * - Maximum allowed fee in lamports for transfer operations.
      */
     transferMaxFee?: number | bigint;
 };
-import { WalletAccountReadOnly } from '@tetherto/wdk-wallet';
+import { WalletAccountReadOnly } from "@tetherto/wdk-wallet";

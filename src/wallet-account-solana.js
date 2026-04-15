@@ -21,7 +21,6 @@ import {
 } from '@solana/signers'
 import { getBase64EncodedWireTransaction } from '@solana/transactions'
 import { signBytes } from '@solana/keys'
-import { setTransactionMessageLifetimeUsingBlockhash } from '@solana/transaction-messages'
 
 import HDKey from 'micro-key-producer/slip10.js'
 
@@ -33,16 +32,29 @@ import { sodium_memzero } from 'sodium-universal'
 import WalletAccountReadOnlySolana from './wallet-account-read-only-solana.js'
 
 /** @typedef {import("@tetherto/wdk-wallet").IWalletAccount} IWalletAccount */
-
 /** @typedef {import('@tetherto/wdk-wallet').KeyPair} KeyPair */
 /** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
 /** @typedef {import('@tetherto/wdk-wallet').TransferOptions} TransferOptions */
 /** @typedef {import('@tetherto/wdk-wallet').TransferResult} TransferResult */
 
+/** @typedef {import('@solana/signers').KeyPairSigner} KeyPairSigner */
+
 /** @typedef {import('./wallet-account-read-only-solana.js').SolanaTransaction} SolanaTransaction */
 /** @typedef {import('./wallet-account-read-only-solana.js').SolanaWalletConfig} SolanaWalletConfig */
 
-const BIP_44_SOL_DERIVATION_PATH_PREFIX = "m/44'/501'"
+const SLIP_0010_SOL_DERIVATION_PATH_PREFIX = "m/44'/501'"
+
+/**
+ * Assert the full path is hardened.
+ * @param {string} path The derivation path.
+ */
+function assertFullHardenedPath (path) {
+  const isValid = path.split('/').reduce((s, e) => s && e.endsWith("'"), true)
+
+  if (!isValid) {
+    throw new Error('In Solana, every child path in a derivation path must be hardened.')
+  }
+}
 
 /**
  * Full-featured Solana wallet account implementation with signing capabilities.
@@ -62,6 +74,8 @@ export default class WalletAccountSolana extends WalletAccountReadOnlySolana {
       seed = bip39.mnemonicToSeedSync(seed)
     }
 
+    assertFullHardenedPath(path)
+
     super(undefined, config)
 
     /**
@@ -72,17 +86,21 @@ export default class WalletAccountSolana extends WalletAccountReadOnlySolana {
      */
     this._config = config
 
-    /** @private */
+    /**
+     * @private
+     */
     this._seed = seed
 
-    /** @private */
-    this._path = `${BIP_44_SOL_DERIVATION_PATH_PREFIX}/${path}`
+    /**
+     * @private
+     */
+    this._path = `${SLIP_0010_SOL_DERIVATION_PATH_PREFIX}/${path}`
 
     /**
      * The Ed25519 key pair signer for signing transactions.
      *
      * @private
-     * @type {import('@solana/keys').KeyPairSigner | undefined}
+     * @type {KeyPairSigner | undefined}
      */
     this._signer = undefined
 
@@ -107,7 +125,7 @@ export default class WalletAccountSolana extends WalletAccountReadOnlySolana {
    * Creates a new solana wallet account.
    *
    * @param {string | Uint8Array} seed - The wallet's [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) seed phrase.
-   * @param {string} path - The BIP-44 derivation path (e.g. "0'/0/0").
+   * @param {string} path - The SLIP-0010 derivation path (e.g. "0'/0'/0'").
    * @param {SolanaWalletConfig} [config] - The configuration object.
    * @returns {Promise<WalletAccountSolana>} The wallet account.
    */
@@ -145,14 +163,14 @@ export default class WalletAccountSolana extends WalletAccountReadOnlySolana {
   }
 
   /**
- * The account's key pair.
- *
- * Returns the raw key pair bytes in standard Solana format.
- * - privateKey: 32-byte Ed25519 secret key (Uint8Array)
- * - publicKey: 32-byte Ed25519 public key (Uint8Array)
- *
- * @type {KeyPair}
- */
+   * The account's key pair.
+   *
+   * Returns the raw key pair bytes in standard Solana format.
+   * - privateKey: 32-byte Ed25519 secret key (Uint8Array)
+   * - publicKey: 32-byte Ed25519 public key (Uint8Array)
+   *
+   * @type {KeyPair}
+   */
   get keyPair () {
     return {
       privateKey: this._rawPrivateKey,
@@ -161,10 +179,10 @@ export default class WalletAccountSolana extends WalletAccountReadOnlySolana {
   }
 
   /**
- * The address of this account.
- *
- * @returns {Promise<string>} The address.
- */
+   * The address of this account.
+   *
+   * @returns {Promise<string>} The address.
+   */
   async getAddress () {
     return this._signer.address
   }
@@ -202,34 +220,15 @@ export default class WalletAccountSolana extends WalletAccountReadOnlySolana {
     }
 
     let transactionMessage = tx
-    if (tx?.to !== undefined && tx?.value !== undefined) {
-      // Handle native token transfer { to, value } transaction
+
+    // Handle native token transfer { to, value } transaction
+    if (tx.to !== undefined && tx.value !== undefined) {
       transactionMessage = await this._buildNativeTransferTransactionMessage(tx.to, tx.value)
     }
-    if (transactionMessage?.instructions !== undefined && Array.isArray(transactionMessage.instructions)) {
-      // Check if blockhash/lifetime is missing and add it
-      if (!transactionMessage.lifetimeConstraint) {
-        const { value: latestBlockhash } = await this._rpc.getLatestBlockhash({
-          commitment: this._commitment
-        }).send()
 
-        transactionMessage = setTransactionMessageLifetimeUsingBlockhash(
-          latestBlockhash,
-          transactionMessage
-        )
-      }
-
-      // Check and verify fee payer
-      if (transactionMessage?.feePayer) {
-        // Verify the fee payer is the current account
-        const feePayerAddress = typeof transactionMessage.feePayer === 'string'
-          ? transactionMessage.feePayer
-          : transactionMessage.feePayer.address
-
-        if (feePayerAddress !== this._signer.address) {
-          throw new Error(`Transaction fee payer (${feePayerAddress}) does not match wallet address (${this._signer.address})`)
-        }
-      }
+    if (Array.isArray(transactionMessage.instructions)) {
+      transactionMessage = await this._ensureLifetime(transactionMessage)
+      await this._assertFeePayer(transactionMessage)
       transactionMessage = setTransactionMessageFeePayerSigner(this._signer, transactionMessage)
     }
 
@@ -264,11 +263,7 @@ export default class WalletAccountSolana extends WalletAccountReadOnlySolana {
 
     const { token, recipient, amount } = options
 
-    const transactionMessage = await this._buildSPLTransferTransactionMessage(
-      token,
-      recipient,
-      amount
-    )
+    const transactionMessage = await this._buildSPLTransferTransactionMessage(token, recipient, amount)
     const fee = await this._getTransactionFee(transactionMessage)
     if (this._config.transferMaxFee !== undefined && fee >= this._config.transferMaxFee) {
       throw new Error('Exceeded maximum fee cost for transfer operation.')

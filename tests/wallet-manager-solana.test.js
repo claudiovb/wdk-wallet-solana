@@ -14,11 +14,19 @@
 
 'use strict'
 
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  jest
+} from '@jest/globals'
 import WalletManagerSolana from '../src/wallet-manager-solana.js'
 import WalletAccountSolana from '../src/wallet-account-solana.js'
 
-const TEST_SEED_PHRASE = 'test walk nut penalty hip pave soap entry language right filter choice'
+const TEST_SEED_PHRASE =
+  'test walk nut penalty hip pave soap entry language right filter choice'
 const TEST_RPC_URL = 'https://mock-url.com'
 
 describe('WalletManagerSolana', () => {
@@ -68,15 +76,15 @@ describe('WalletManagerSolana', () => {
   })
 
   describe('getAccountByPath', () => {
-    it('should return account for path "0\'/0/0"', async () => {
-      const account = await wallet.getAccountByPath("0'/0/0")
+    it("should return account for path \"0'/0'/0'\"", async () => {
+      const account = await wallet.getAccountByPath("0'/0'/0'")
       expect(account).toBeInstanceOf(WalletAccountSolana)
-      expect(account.path).toBe("m/44'/501'/0'/0/0")
+      expect(account.path).toBe("m/44'/501'/0'/0'/0'")
     })
 
     it('should return different accounts for different paths', async () => {
-      const account1 = await wallet.getAccountByPath("0'/0/0")
-      const account2 = await wallet.getAccountByPath("0'/0/1")
+      const account1 = await wallet.getAccountByPath("0'/0'/0'")
+      const account2 = await wallet.getAccountByPath("0'/0'/1'")
       expect(account1).not.toBe(account2)
       expect(await account1.getAddress()).not.toBe(await account2.getAddress())
     })
@@ -120,9 +128,9 @@ describe('WalletManagerSolana', () => {
 
     it('should calculate normal rate as 110% of max fee', async () => {
       mockRpc.getRecentPrioritizationFees.mockReturnValue({
-        send: jest.fn().mockResolvedValue([
-          { slot: 1, prioritizationFee: 1000 }
-        ])
+        send: jest
+          .fn()
+          .mockResolvedValue([{ slot: 1, prioritizationFee: 1000 }])
       })
 
       wallet._rpc = mockRpc
@@ -134,9 +142,9 @@ describe('WalletManagerSolana', () => {
 
     it('should calculate fast rate as 200% of max fee', async () => {
       mockRpc.getRecentPrioritizationFees.mockReturnValue({
-        send: jest.fn().mockResolvedValue([
-          { slot: 1, prioritizationFee: 1000 }
-        ])
+        send: jest
+          .fn()
+          .mockResolvedValue([{ slot: 1, prioritizationFee: 1000 }])
       })
 
       wallet._rpc = mockRpc
@@ -224,7 +232,9 @@ describe('WalletManagerSolana', () => {
 
       wallet._rpc = mockRpc
 
-      await expect(wallet.getFeeRates()).rejects.toThrow('RPC connection failed')
+      await expect(wallet.getFeeRates()).rejects.toThrow(
+        'RPC connection failed'
+      )
     })
   })
 })

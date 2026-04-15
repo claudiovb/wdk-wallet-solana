@@ -16,11 +16,14 @@
 
 import WalletManager from '@tetherto/wdk-wallet'
 
+import FailoverProvider from '@tetherto/wdk-failover-provider'
+
 import { createSolanaRpc } from '@solana/rpc'
 
 import WalletAccountSolana from './wallet-account-solana.js'
 
 /** @typedef {ReturnType<typeof import('@solana/rpc').createSolanaRpc>} SolanaRpc */
+/** @typedef {import("@solana/rpc-types").Commitment} Commitment */
 
 /** @typedef {import('@tetherto/wdk-wallet').FeeRates} FeeRates */
 
@@ -43,36 +46,47 @@ export default class WalletManagerSolana extends WalletManager {
     super(seed, config)
 
     /**
-    * The solana wallet configuration.
-    *
-    * @protected
-    * @type {SolanaWalletConfig}
-    */
+     * The solana wallet configuration.
+     *
+     * @protected
+     * @type {SolanaWalletConfig}
+     */
     this._config = config
 
-    const { rpcUrl, commitment = 'confirmed' } = config
+    const { rpcUrl, commitment = 'confirmed', retries = 3 } = config
 
-    if (rpcUrl) {
-      /**
-       * A Solana RPC client for HTTP requests.
-       *
-       * @protected
-       * @type {SolanaRpc}
-       */
+    /**
+     * The commitment level for transactions.
+     *
+     * @protected
+     * @type {Commitment}
+     */
+    this._commitment = commitment
+
+    /**
+     * Solana RPC client for making HTTP requests to the blockchain.
+     *
+     * @protected
+     * @type {SolanaRpc | undefined}
+     */
+    this._rpc = undefined
+
+    if (Array.isArray(rpcUrl)) {
+      if (rpcUrl.length > 0) {
+        const failoverProvider = new FailoverProvider({ retries })
+        for (const entry of rpcUrl) {
+          const option = createSolanaRpc(entry)
+          failoverProvider.addProvider(option)
+        }
+        this._rpc = failoverProvider.initialize()
+      }
+    } else if (rpcUrl) {
       this._rpc = createSolanaRpc(rpcUrl)
-
-      /**
-       * The commitment level for transactions.
-       *
-       * @protected
-       * @type {string}
-       */
-      this._commitment = commitment
     }
   }
 
   /**
-   * Returns the wallet account at a specific index (see [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)).
+   * Returns the wallet account at a specific index (see [SLIP-0010](https://slips.readthedocs.io/en/latest/slip-0010/)).
    *
    * @example
    * // Returns the account with derivation path m/44'/501'/index'/0'
@@ -85,12 +99,12 @@ export default class WalletManagerSolana extends WalletManager {
   }
 
   /**
-   * Returns the wallet account at a specific BIP-44 derivation path.
+   * Returns the wallet account at a specific SLIP-0010 derivation path.
    *
    * @example
-   * // Returns the account with derivation path m/44'/501'/0'/0/1
-   * const account = await wallet.getAccountByPath("0'/0/1");
-   * @param {string} path - The derivation path (e.g. "0'/0/0").
+   * // Returns the account with derivation path m/44'/501'/0'/0'/1'
+   * const account = await wallet.getAccountByPath("0'/0'/1'");
+   * @param {string} path - The derivation path (e.g. "0'/0'/0'").
    * @returns {Promise<WalletAccountSolana>} The account.
    */
   async getAccountByPath (path) {
@@ -104,10 +118,10 @@ export default class WalletManagerSolana extends WalletManager {
   }
 
   /**
- * Returns the current fee rates.
- *
- * @returns {Promise<FeeRates>} The fee rates (in lamports).
- */
+   * Returns the current fee rates.
+   *
+   * @returns {Promise<FeeRates>} The fee rates (in lamports).
+   */
   async getFeeRates () {
     if (!this._rpc) {
       throw new Error('The wallet must be connected to a provider to get fee rates.')
@@ -115,17 +129,14 @@ export default class WalletManagerSolana extends WalletManager {
 
     const fees = await this._rpc.getRecentPrioritizationFees().send()
 
-    const nonZeroFees = fees
-      .filter(fee => fee.prioritizationFee > 0)
-      .map(fee => BigInt(fee.prioritizationFee))
+    const nonZeroFees = fees.filter((fee) => fee.prioritizationFee > 0).map((fee) => BigInt(fee.prioritizationFee))
 
-    const fee = nonZeroFees.length > 0
-      ? nonZeroFees.reduce((max, fee) => fee > max ? fee : max, 0n)
-      : DEFAULT_BASE_FEE
+    const fee =
+      nonZeroFees.length > 0 ? nonZeroFees.reduce((max, fee) => (fee > max ? fee : max), 0n) : DEFAULT_BASE_FEE
 
     return {
-      normal: fee * FEE_RATE_NORMAL_MULTIPLIER / 100n,
-      fast: fee * FEE_RATE_FAST_MULTIPLIER / 100n
+      normal: (fee * FEE_RATE_NORMAL_MULTIPLIER) / 100n,
+      fast: (fee * FEE_RATE_FAST_MULTIPLIER) / 100n
     }
   }
 }
