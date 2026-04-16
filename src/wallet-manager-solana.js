@@ -64,7 +64,7 @@ export default class WalletManagerSolana extends WalletManager {
     this._commitment = commitment
 
     /**
-     * Solana RPC client for making HTTP requests to the blockchain.
+     * A Solana RPC client for HTTP requests.
      *
      * @protected
      * @type {SolanaRpc | undefined}
