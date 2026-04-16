@@ -17,7 +17,7 @@ export default class WalletAccountReadOnlySolana extends WalletAccountReadOnly {
      */
     protected _config: Omit<SolanaWalletConfig, "transferMaxFee">;
     /**
-     * Solana RPC client for making HTTP requests to the blockchain.
+     * A Solana RPC client for HTTP requests.
      *
      * @protected
      * @type {SolanaRpc | undefined}
@@ -120,7 +120,7 @@ export default class WalletAccountReadOnlySolana extends WalletAccountReadOnly {
      * @returns {Promise<void>} Resolves when the transaction has no explicit fee payer or it matches this wallet address.
      * @throws {Error} If the transaction fee payer does not match this wallet address.
      */
-    protected _assertFeePayer (tx: SolanaTransaction): Promise<void>
+    protected _assertFeePayer(tx: SolanaTransaction): Promise<void>;
 }
 export type TransactionResult = import("@tetherto/wdk-wallet").TransactionResult;
 export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
@@ -144,7 +144,7 @@ export type SolanaWalletConfig = {
     /**
      * - The provider's rpc url. If it's a list of urls, the provider failover strategy will be enabled.
      */
-    rpcUrl?: string;
+    rpcUrl?: string | string[];
     /**
      * - The commitment level (default: 'confirmed').
      */
@@ -152,7 +152,7 @@ export type SolanaWalletConfig = {
     /**
      * - The number of retries in the failover mechanism.
      */
-    retries?: number,
+    retries?: number;
     /**
      * - Maximum allowed fee in lamports for transfer operations.
      */
